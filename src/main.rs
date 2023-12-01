@@ -3,39 +3,97 @@ use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 type Data = f32;
 
 async fn task_a(
-    receiver: UnboundedReceiver<Data>,
+    mut receiver: UnboundedReceiver<Data>,
     send_to_b: UnboundedSender<Data>,
-    send_to_c: UnboundedSender<Data>,
+    _send_to_c: UnboundedSender<Data>,
     send_to_d: UnboundedSender<Data>,
 ) {
-    println!("Hello from task A!");
+    let initial_data = receiver.recv().await.unwrap();
+    println!("[A] Got initial data: {initial_data}");
+
+    println!("[A] Forwarding initial data to B and D");
+    send_to_b.send(initial_data).unwrap();
+    send_to_d.send(initial_data).unwrap();
+
+    let intermediate_data = receiver.recv().await.unwrap();
+    println!("[A] Got intermediate data: {intermediate_data}");
+
+    let result = (intermediate_data + initial_data) * 0.7;
+
+    println!("[A] Sending result to B: {result}");
+    send_to_b.send(result).unwrap();
+
+    println!("[A] Done! ✅");
 }
 
 async fn task_b(
-    receiver: UnboundedReceiver<Data>,
+    mut receiver: UnboundedReceiver<Data>,
     send_to_a: UnboundedSender<Data>,
     send_to_c: UnboundedSender<Data>,
-    send_to_d: UnboundedSender<Data>,
+    _send_to_d: UnboundedSender<Data>,
 ) {
-    println!("Hello from task B!");
+    let initial_data = receiver.recv().await.unwrap();
+    println!("[B] Got initial data: {initial_data}");
+
+    let intermediate_data = initial_data.powi(5);
+
+    println!("[B] Forwarding intermediate data to A and C");
+    send_to_a.send(intermediate_data).unwrap();
+    send_to_c.send(intermediate_data).unwrap();
+
+    let first_summand = receiver.recv().await.unwrap();
+    println!("[B] Got first summand: {first_summand}");
+    let second_summand = receiver.recv().await.unwrap();
+    println!("[B] Got second summand: {second_summand}");
+    let third_summand = receiver.recv().await.unwrap();
+    println!("[B] Got third summand: {third_summand}");
+
+    let result = first_summand + second_summand + third_summand;
+    println!("[B] BINGO: {result}");
+
+    println!("[B] Done! ✅");
 }
 
 async fn task_c(
-    receiver: UnboundedReceiver<Data>,
-    send_to_a: UnboundedSender<Data>,
+    mut receiver: UnboundedReceiver<Data>,
+    _send_to_a: UnboundedSender<Data>,
     send_to_b: UnboundedSender<Data>,
     send_to_d: UnboundedSender<Data>,
 ) {
-    println!("Hello from task C!");
+    let initial_data = receiver.recv().await.unwrap();
+    println!("[C] Got initial data: {initial_data}");
+
+    let intermediate_data = initial_data.powi(3);
+
+    println!("[C] Forwarding intermediate data to D");
+    send_to_d.send(intermediate_data).unwrap();
+
+    let file_content = receiver.recv().await.unwrap();
+    println!("[C] Got file content: {file_content}");
+
+    println!("[C] Forwarding file content to B");
+    send_to_b.send(file_content).unwrap();
+
+    println!("[C] Done! ✅");
 }
 
 async fn task_d(
-    receiver: UnboundedReceiver<Data>,
-    send_to_a: UnboundedSender<Data>,
+    mut receiver: UnboundedReceiver<Data>,
+    _send_to_a: UnboundedSender<Data>,
     send_to_b: UnboundedSender<Data>,
-    send_to_c: UnboundedSender<Data>,
+    _send_to_c: UnboundedSender<Data>,
 ) {
-    println!("Hello from task D!");
+    let first_input = receiver.recv().await.unwrap();
+    println!("[D] Got first input: {first_input}");
+
+    let second_input = receiver.recv().await.unwrap();
+    println!("[D] Got second input: {second_input}");
+
+    let result = (first_input * second_input) / (first_input + second_input);
+    println!("[D] Sending result to B: {result}");
+    send_to_b.send(result).unwrap();
+
+    println!("[D] Done! ✅");
 }
 
 #[tokio::main]
@@ -72,6 +130,12 @@ async fn main() {
     tasks.push(tokio::spawn(
         async move { task_d(d_receive, sa, sb, sc).await },
     ));
+
+    // ----------- SEND INITIAL DATA ---------------------------------------------------------------
+    senders[0].send(1.5).unwrap();
+
+    // ----------- FILL FILE CONTENT ---------------------------------------------------------------
+    senders[2].send(2.7).unwrap();
 
     // ----------- JOIN TASKS ----------------------------------------------------------------------
     for task in tasks {
