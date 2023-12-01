@@ -31,7 +31,10 @@ jobs:
         shell: bash
         run: cargo fmt --all --check
 
-# You can also use dedicated actions:
-# - https://github.com/actions-rs (popular, but abandoned recently)
-# - https://github.com/actions-rust-lang
-# - https://github.com/Cardinal-Cryptography/github-actions/blob/main/install-rust-toolchain/action.yml
+      - name: Run clippy checks
+        shell: bash
+        run: cargo clippy --all --all-targets -- -D warnings
+
+      - name: Run tests
+        shell: bash
+        run: cargo test
